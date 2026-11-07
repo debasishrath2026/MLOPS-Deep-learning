@@ -1,0 +1,35 @@
+name: Connect to AWS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Required for GitHub OIDC -> AWS (no long-lived access keys)
+permissions:
+  id-token: write   # lets the job request an OIDC token
+  contents: read    # lets actions/checkout read the repo
+
+env:
+  AWS_REGION: us-east-1   # change to your region
+
+jobs:
+  aws:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}   # e.g. arn:aws:iam::123456789012:role/github-actions-role
+          role-session-name: github-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      # Example: replace with your own AWS commands
+      - name: List S3 buckets
+        run: aws s3 ls
