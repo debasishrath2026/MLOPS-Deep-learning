@@ -1,4 +1,4 @@
-name: Connect to AWS
+name: Build and push to ECR
 
 on:
   push:
@@ -11,25 +11,40 @@ permissions:
   contents: read    # lets actions/checkout read the repo
 
 env:
-  AWS_REGION: us-east-1   # change to your region
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: mlops-deep-learning
 
 jobs:
-  aws:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # The PyTorch CUDA base image is several GB; the default runner can run out of disk.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          df -h /
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}   # e.g. arn:aws:iam::123456789012:role/github-actions-role
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: github-${{ github.run_id }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Verify AWS identity
         run: aws sts get-caller-identity
 
-      # Example: replace with your own AWS commands
-      - name: List S3 buckets
-        run: aws s3 ls
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+        run: |
+          docker build -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
+          docker push --all-tags "$IMAGE"
