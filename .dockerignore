@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+.dvc/cache
+__pycache__/
+*.pyc
+.pytest_cache/
+logs/
+outputs/
+data/
